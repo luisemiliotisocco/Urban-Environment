@@ -3,6 +3,7 @@ library(tidyverse)
 library(sf)
 library(ggplot2)
 library(leaflet)
+options(scipen = 999)
 proj <- 4326
 #proj <- "+proj=laea +lat_0=-40 +lon_0=-60 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 
@@ -15,12 +16,18 @@ arbolado_calle <- read.csv("data/BAdata/arbolado-publico-lineal-2017-2018/arbola
 arbolado_parques <- read.csv("data/BAdata/arbolado-en-espacios-verdes/arbolado-en-espacios-verdes.csv", 
                            stringsAsFactors = TRUE, encoding = "UTF-8")
 
+EV <- st_read("data/BAdata/espacio-verde-publico/espacio-verde-publico.shp") %>% 
+    st_transform(proj)
+
+radios <- st_read("data/INDEC/cabaxrdatos.shp") %>% 
+    st_transform(proj) %>% 
+    dplyr::select(PAIS0210_I, TOT_POB) %>% 
+    rename(ID=PAIS0210_I) %>% 
+    mutate(AREA=as.numeric(st_area(.)*0.0001))
+
 manzanas <- st_read("data/BAdata/manzanas/manzanas.geojson") %>% 
     st_transform(proj) %>% 
     select(SM)
-
-EV <- st_read("data/BAdata/espacio-verde-publico/espacio-verde-publico.shp") %>% 
-    st_transform(proj)
 
 # Consolidar ambos shapes en una unica base    
 
@@ -52,21 +59,37 @@ arbolado <- st_as_sf(arbolado, coords = c("long", "lat"), crs=proj)
 #    geom_sf(data=EV, fill="grey60", color=NA)+
 #    theme_void()
 
-manzanas_buffer <- manzanas %>% 
-    st_buffer(1000) 
-
 arbolado2 <- arbolado  %>% 
-    sample_n(10) %>% 
     mutate(lat = unlist(map(geometry,2)),
            long = unlist(map(geometry,1)))
 
-manzanas_buffer_arbolado <- st_join (arbolado2, manzanas_buffer)
+ggplot()+
+    geom_sf(data=radios)+
+    stat_density_2d(data=arbolado2, aes(x=long, y=lat, fill = stat(level)), 
+                    color = "grey20", size=0.8, linetype="dashed", geom = "polygon", alpha=.5)+
+    scale_fill_viridis_c(direction = -1, option = "magma")+
+    theme_void()
+
+
+#### 
+
+manzanas_buffer_arbolado <- st_join (arbolado, radios)
+
+
+cantidad_arbolado_parcela <- manzanas_buffer_arbolado %>% 
+    as.data.frame() %>% 
+    group_by(ID) %>%
+    summarise(cant_arbolado=n())
+
+
+radios <- radios %>% 
+    left_join(cantidad_arbolado_parcela, by = "ID", na.rm=TRUE) %>% 
+    mutate(arboles_por_poblacion=cant_arbolado/TOT_POB) %>% 
+    mutate(arboles_por_area=cant_arbolado/AREA) 
 
 ggplot()+
-    geom_sf(data=manzanas_buffer)+
-    geom_sf(data=arbolado2)
+    geom_sf(data=radios %>% dplyr::filter(ID!=c(83, 2247)), aes(fill=arboles_por_poblacion))+
+    scale_fill_viridis_c(option = "magma", direction = -1)+
+    theme_void()
 
-manzanas_buffer_df <- manzanas_buffer_arbolado %>% 
-    as.data.frame() %>% 
-    group_by(SM) %>% 
-    summarise(cantidad_arboles=n())
+
