@@ -1,3 +1,9 @@
+## OBJETIVOS: 
+# CUANTOS ARBOLES HAY POR PERSONA EN LA CIUDAD
+# CUALES SON LOS HOTSPOTS
+# CORRELACIÓN ENTRE EL ARBOLADO Y LA ALTURA DE LA EDIFICION
+
+
 # Cargamos las librerías que estaremos usando en este análisis
 library(tidyverse)
 library(sf)
@@ -88,7 +94,7 @@ radios <- radios %>%
     mutate(arboles_por_area=cant_arbolado/AREA) 
 
 ggplot()+
-    geom_sf(data=radios %>% dplyr::filter(ID!=c(83, 2247)), aes(fill=arboles_por_poblacion))+
+    geom_sf(data=radios %>% dplyr::filter(ID!=c(83, 2247)), aes(fill=arboles_por_area))+
     scale_fill_viridis_c(option = "magma", direction = -1)+
     theme_void()
 
